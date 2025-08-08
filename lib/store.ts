@@ -9,7 +9,7 @@ type Key = string | symbol
 export class Store {
   [priv]: Record<string | symbol, unknown> = {};
   [subscribers]: { [K in keyof this]?: Set<() => void> } = {};
-  [evaluating]?: Set<Key>;
+  [evaluating] = new Array<Set<Key>>();
   [computedCache] = new Map<Key, unknown>();
   [computedDispose] = new Map<Key, () => void>()
 }
@@ -42,7 +42,7 @@ function defineField(store: Store, key: Key) {
       }
     },
     get() {
-      this[evaluating]?.add(key)
+      this[evaluating].at(-1)?.add(key)
       return this[priv][key]
     },
   } satisfies ThisType<Store>)
@@ -50,7 +50,7 @@ function defineField(store: Store, key: Key) {
 
 function defineComputed<T>(key: Key, compute: Getter<T>): Getter<T> {
   return function () {
-    this[evaluating]?.add(key)
+    this[evaluating].at(-1)?.add(key)
 
     if (this[computedCache].has(key)) {
       return this[computedCache].get(key) as T
@@ -58,10 +58,11 @@ function defineComputed<T>(key: Key, compute: Getter<T>): Getter<T> {
 
     this[computedDispose]?.get(key)?.()
 
-    this[evaluating] = new Set()
+    const deps = new Set<Key>()
+    this[evaluating].push(deps)
     const value = compute.call(this)
 
-    const dispose = [...this[evaluating].values()].map((dep) =>
+    const dispose = [...deps.values()].map((dep) =>
       subscribe(this, dep as keyof Store, () => {
         this[computedCache].delete(key)
         setTimeout(() => notify(this, key as keyof Store))
@@ -70,7 +71,7 @@ function defineComputed<T>(key: Key, compute: Getter<T>): Getter<T> {
 
     this[computedDispose].set(key, () => dispose.forEach((cb) => cb()))
     this[computedCache].set(key, value)
-    delete this[evaluating]
+    this[evaluating].pop()
     return value
   }
 }
