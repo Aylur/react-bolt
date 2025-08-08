@@ -1,0 +1,36 @@
+{
+  "name": "react-bolt",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aylur/react-bolt.git"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "latest"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./legacy": {
+      "import": "./dist/legacy.js",
+      "types": "./dist/legacy.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "prettier": {
+    "semi": false
+  }
+}
