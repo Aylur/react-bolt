@@ -1,2 +1,2 @@
 export { useStore, useStoreSelection } from "./hooks"
-export { Store, subscribe, field, computed } from "./store"
+export { Store, subscribe, notify, field, computed } from "./store"

@@ -24,7 +24,7 @@ export function subscribe<S extends Store, K extends keyof S>(
   return () => void set.delete(callback)
 }
 
-function notify<S extends Store, K extends keyof S>(store: S, key: K) {
+export function notify<S extends Store, K extends keyof S>(store: S, key: K) {
   store[subscribers][key]?.forEach((cb) => cb())
 }
 
