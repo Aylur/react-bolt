@@ -1,4 +1,4 @@
-import { useCallback, useRef, useSyncExternalStore } from "react"
+import { useCallback, useRef, useState, useSyncExternalStore } from "react"
 import { type Store, subscribe, selector } from "./store"
 
 export function useStore<S extends Store, K extends keyof S>(
@@ -21,7 +21,14 @@ export function useStore<S extends Store>(
   arg: ((store: S) => unknown) | keyof S,
   ...args: Array<keyof S>
 ) {
-  const value = useRef<unknown>(null)
+  const [initial] = useState(() =>
+    typeof arg === "function"
+      ? arg(store)
+      : args.length === 0
+        ? store[arg]
+        : [arg, ...args].map((key) => store[key]),
+  )
+  const value = useRef<unknown>(initial)
 
   const subscribeCallback = useCallback(
     (callback: () => void) => {
