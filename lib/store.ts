@@ -113,3 +113,15 @@ export function computedLegacy<T>(
   const compute = desc.get as Getter<T>
   desc.get = defineComputed(key, compute)
 }
+
+export function selector<S extends Store, Result>(
+  store: S,
+  selector: (store: S) => Result,
+) {
+  const deps = new Set<Key>()
+  store[evaluating].push(deps)
+  const result = selector(store)
+  store[evaluating].pop()
+
+  return [deps as Set<keyof S>, result] as const
+}

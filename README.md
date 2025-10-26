@@ -12,19 +12,22 @@ class MyStore extends Store {
   }
 }
 
-export const model = new Model()
+export const myStore = new MyStore()
 ```
 
 ```tsx
-import { useStoreSelection, useStore } from "react-bolt"
+import { useStore } from "react-bolt"
 
 function Sum() {
-  const sum = useStore(model, "sum")
+  const sum = useStore(myStore, "sum")
   return <b>{sum}</b>
 }
 
 function App() {
-  const [c1, c2] = useStoreSelection(model, "count1", "count2")
+  const [c1, c2] = useStoreSelection(myStore, (s) => [s.count1, s.count2])
+
+  // alternatively
+  const [c1, c2] = useStoreSelection(myStore, "count1", "count2")
 
   return (
     <h1>
