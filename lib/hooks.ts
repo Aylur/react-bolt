@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from "react"
-import { type Store, subscribe, selector } from "./store"
+import { type Store, subscribe, selector } from "./store.js"
 
 export function useStore<S extends Store, K extends keyof S>(
   store: S,
