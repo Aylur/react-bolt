@@ -33,21 +33,25 @@ export function useStore<S extends Store>(
   const subscribeCallback = useCallback(
     (callback: () => void) => {
       // selector
+      // TODO: don't assume the subscribe function is always a new ref:
+      // cleanup previous dependencies and rerun the selector
       if (typeof arg === "function") {
-        const [keys, result] = selector(store, arg)
+        const [dependencyMap, result] = selector(store, arg)
         value.current = result
 
-        const unsubs = [...keys].map((key) =>
-          subscribe(store, key, () => {
-            // this assumes that dependencies did not change
-            // however passing a new subscribe function will
-            // trigger a resubscription anyway
-            const [, result] = selector(store, arg)
-            value.current = result
-            callback()
-          }),
+        const dispose = [...dependencyMap].flatMap(([dependency, keys]) =>
+          [...keys].map((key) =>
+            subscribe(dependency, key as keyof Store, () => {
+              // this assumes that dependencies did not change
+              // however passing a new subscribe function will
+              // trigger a resubscription anyway
+              const [, result] = selector(store, arg)
+              value.current = result
+              callback()
+            }),
+          ),
         )
-        return () => unsubs.forEach((cb) => cb())
+        return () => dispose.forEach((cb) => cb())
       }
 
       // single key

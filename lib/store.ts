@@ -1,15 +1,31 @@
 const priv = Symbol("store private")
 const subscribers = Symbol("store subscribers")
-const evaluating = Symbol("evaluating fields")
 const computedCache = Symbol("cached computed values")
 const computedDispose = Symbol("computed dispose callbacks")
 
 type Key = string | symbol
 
+type DependencyMap = Map<Store, Set<Key>>
+const dependencyStack = new Array<DependencyMap>()
+
+function track(store: Store, key: Key) {
+  const dependency = dependencyStack.at(-1)
+  if (dependency) {
+    const keys = dependency.get(store) ?? new Set()
+    keys.add(key)
+    dependency.set(store, keys)
+  }
+}
+
+function push() {
+  const dependencyMap: DependencyMap = new Map()
+  dependencyStack.push(dependencyMap)
+  return dependencyMap
+}
+
 export class Store {
   [priv]: Record<string | symbol, unknown> = {};
   [subscribers]: { [K in keyof this]?: Set<() => void> } = {};
-  [evaluating] = new Array<Set<Key>>();
   [computedCache] = new Map<Key, unknown>();
   [computedDispose] = new Map<Key, () => void>()
 }
@@ -18,7 +34,7 @@ export function subscribe<S extends Store, K extends keyof S>(
   store: S,
   key: K,
   callback: () => void,
-) {
+): () => void {
   const set = (store[subscribers][key] ??= new Set())
   set.add(callback)
   return () => void set.delete(callback)
@@ -42,7 +58,7 @@ function defineField(store: Store, key: Key) {
       }
     },
     get() {
-      this[evaluating].at(-1)?.add(key)
+      track(this, key)
       return this[priv][key]
     },
   } satisfies ThisType<Store>)
@@ -50,7 +66,7 @@ function defineField(store: Store, key: Key) {
 
 function defineComputed<T>(key: Key, compute: Getter<T>): Getter<T> {
   return function () {
-    this[evaluating].at(-1)?.add(key)
+    track(this, key)
 
     if (this[computedCache].has(key)) {
       return this[computedCache].get(key) as T
@@ -58,20 +74,24 @@ function defineComputed<T>(key: Key, compute: Getter<T>): Getter<T> {
 
     this[computedDispose]?.get(key)?.()
 
-    const deps = new Set<Key>()
-    this[evaluating].push(deps)
+    const dependencyMap = push()
     const value = compute.call(this)
 
-    const dispose = [...deps.values()].map((dep) =>
-      subscribe(this, dep as keyof Store, () => {
-        this[computedCache].delete(key)
-        setTimeout(() => notify(this, key as keyof Store))
-      }),
+    const dispose = [...dependencyMap].flatMap(([store, dependencies]) =>
+      [...dependencies].map((dep) =>
+        subscribe(store, dep as keyof Store, () => {
+          this[computedCache].delete(key)
+          // if there is a subscription that immediately invokes a recomputation
+          // which is very likely, this would result in an infinite loop, so we
+          // need the timeout to escape order of execution
+          setTimeout(() => notify(this, key as keyof Store))
+        }),
+      ),
     )
 
     this[computedDispose].set(key, () => dispose.forEach((cb) => cb()))
     this[computedCache].set(key, value)
-    this[evaluating].pop()
+    dependencyStack.pop()
     return value
   }
 }
@@ -118,10 +138,9 @@ export function selector<S extends Store, Result>(
   store: S,
   selector: (store: S) => Result,
 ) {
-  const deps = new Set<Key>()
-  store[evaluating].push(deps)
+  const dependencyMap = push()
   const result = selector(store)
-  store[evaluating].pop()
+  dependencyStack.pop()
 
-  return [deps as Set<keyof S>, result] as const
+  return [dependencyMap, result] as const
 }

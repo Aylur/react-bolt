@@ -1,6 +1,6 @@
 {
   "name": "react-bolt",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -31,6 +31,7 @@
     "dist"
   ],
   "prettier": {
-    "semi": false
+    "semi": false,
+    "proseWrap": "always"
   }
 }
