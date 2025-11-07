@@ -1,9 +1,11 @@
 # React Bolt
 
-Reactive stores using decorators.
+Yet another client side state management library
 
 ```tsx
-class MyStore extends Store {
+import { field, computed, useStore } from "react-bolt"
+
+class MyStore {
   @field count = 1
 
   @computed get double() {
@@ -30,34 +32,29 @@ function App() {
 
 ## Features
 
-Bolt uses classes and decorators which allows stores to encapsulate logic and
-behave as a data model for React apps. It was inspired by Svelte's reactive
-classes.
-
 ### Stores
 
 ```ts
-import { Store, field, subscribe } from "react-bolt"
+import { field, subscribe, effect } from "react-bolt"
 
-class MyStore extends Store {
+class MyStore {
   // read-write reactive value
   @field field: number
 
   constructor(init: number) {
-    super()
     this.field = init
   }
 }
 
 const myStore = new MyStore(4)
 
-const dispose = subscribe(myStore, "field", () => {
+const dispose = effect(() => {
   console.log(myStore.field)
 })
 
 myStore.field++ // simply mutate the field to invoke subscription callbacks
 
-dispose() // unsubscribe at any point
+dispose() // dispose effect at any point
 ```
 
 ### Encapsulation
@@ -84,19 +81,18 @@ class MyStore extends Store {
 }
 ```
 
-`@computed` results are cached and will be lazily computed when accessed. The
-cached value is invalidated when any dependency changes.
+`computed` will be lazily computed when accessed. The value is invalidated when
+any dependency changes.
 
 ### Nested stores
 
 Stores can be nested.
 
 ```ts
-class Book extends Store {
+class Book {
   @field title: string
 
-  constructor(init: Pick<Book, "title">) {
-    super()
+  constructor(title: Pick<Book, "title">) {
     this.title = init.title
   }
 }
@@ -114,53 +110,48 @@ class Author extends Store {
 ```
 
 `titles` tracks the `books` field and each `title` field. When any of them
-changes `titles` field is invalidated and subscriptions are executed.
-
-In order for a computed field to know its dependencies it has to be computed.
-
-```ts
-const author = new Author()
-
-subscribe(author, "titles", () => {
-  console.log(author.titles)
-})
-
-// without this line the subscription callback is not invoked because
-// it does not yet know that books is a dependency yet.
-author.titles
-
-author.books = [...author.books, new Book()]
-```
+changes `titles` field is invalidated and effects are triggered.
 
 ### React hooks
 
 In React use the `useStore` hook to subscribe to value changes.
 
 ```tsx
-function Component() {
-  const books = useStore(author, "books")
-  const book1title = useStore(books[1], "title")
-
-  // selector which will also deeply track dependencies, similarly to @computed
-  const titles = useStore(author, (s) => s.books.map((book) => book.title))
-}
+const books = useStore(author, "books")
+const book1title = useStore(books[1], "title")
 ```
 
-Alternatively, use the `createStoreHook` for an instance of store.
+You can use the `useBolt` hook which will track reactive values in its scope,
 
 ```tsx
-const useAuthor = createStoreHook(new Author())
-
-function Component() {
-  const titles = useAuthor("titles")
-  const [books, titles] = useAuthor("books", "titles")
-}
+// deeply tracks dependencies similarly to `computed`
+const titles = useBolt(() => author.books.map((book) => book.title))
 ```
 
-## Decorators version
+Alternatively, use the `createStoreHook` to wrap an instance of a store as a
+hook.
 
-The `react-bolt` module uses stage 3 decorators so make sure that
-`experimentalDecorators` in tsconfig is disabled.
+```tsx
+const useAuthor = createStoreHook(author)
 
-To use stage 2 decorators with `experimentalDecorators` turned on use the
-`react-bolt/legacy` module.
+const titles = useAuthor("titles")
+const [books, titles] = useAuthor("books", "titles")
+```
+
+### Primitives
+
+You can also directly use the underlying primitives
+
+```ts
+import { atom, computed, effect } from "react-bolt"
+
+const a = atom(1)
+const b = atom(2)
+const c = computed(() => a() + b())
+
+effect(() => {
+  console.log(c())
+})
+
+a.set(a() + 1)
+```
