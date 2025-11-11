@@ -1,4 +1,4 @@
-import { atom, computed as derived, track } from "./atom.js"
+import { computed, state } from "./state.js"
 
 const priv = Symbol("priv")
 
@@ -13,15 +13,15 @@ function defineField(store: Store, key: Key) {
     configurable: true,
     enumerable: true,
     set(value: unknown) {
-      return this[priv][key].set(value)
+      return this[priv][key][1](value)
     },
     get() {
-      return this[priv][key]()
+      return this[priv][key][0]()
     },
   })
 }
 
-export function field<T>(
+export function stateDecorator<T>(
   _: undefined,
   ctx: ClassFieldDecoratorContext<Store, T>,
 ): Field<T> {
@@ -34,12 +34,12 @@ export function field<T>(
 
   return function (init) {
     const internals = this[priv] ?? (this[priv] = {})
-    internals[key] = atom(init)
+    internals[key] = state(init)
     return void init as T
   }
 }
 
-export function computed<T>(
+export function computedDecorator<T>(
   compute: () => T,
   ctx: ClassGetterDecoratorContext<Store, T>,
 ): Getter<T> {
@@ -47,27 +47,12 @@ export function computed<T>(
 
   ctx.addInitializer(function () {
     const internals = this[priv] ?? (this[priv] = {})
-    internals[key] = derived(compute.bind(this))
+    internals[key] = computed(compute.bind(this))
   })
 
   return function () {
     return this[priv][key]()
   }
-}
-
-export function subscribe<S extends Store, Key extends keyof Store>(
-  store: S,
-  key: keyof S,
-  fn: (value: S[Key]) => void,
-) {
-  const [value, accessors] = track(store[priv][key])
-  fn(value as S[Key])
-  const dispose = [...accessors].map((a) =>
-    a.subscribe(() => {
-      fn(store[priv][key]())
-    }),
-  )
-  return () => dispose.map((fn) => fn())
 }
 
 /** @experimental */
@@ -77,15 +62,15 @@ export function createStore<S extends Store>(store: S): S {
 
   for (const [key, desc] of properties) {
     if ("value" in desc) {
-      const value = atom(desc.value)
+      const [get, set] = state(desc.value)
       Object.defineProperty(obj, key, {
-        get: value,
-        set: value.set,
+        get,
+        set,
         enumerable: true,
       })
     } else if ("get" in desc) {
       Object.defineProperty(obj, key, {
-        get: derived(desc.get!.bind(obj)),
+        get: computed(desc.get!.bind(obj)),
         set: desc.set,
         enumerable: true,
       })

@@ -3,10 +3,10 @@
 Yet another client side state management library
 
 ```tsx
-import { field, computed, useStore } from "react-bolt"
+import { state, computed, useStore } from "react-bolt"
 
 class MyStore {
-  @field count = 1
+  @state count = 1
 
   @computed get double() {
     return this.count * 2
@@ -35,11 +35,11 @@ function App() {
 ### Stores
 
 ```ts
-import { field, subscribe, effect } from "react-bolt"
+import { state, subscribe, effect } from "react-bolt"
 
 class MyStore {
   // read-write reactive value
-  @field field: number
+  @state field: number
 
   constructor(init: number) {
     this.field = init
@@ -52,7 +52,7 @@ const dispose = effect(() => {
   console.log(myStore.field)
 })
 
-myStore.field++ // simply mutate the field to invoke subscription callbacks
+myStore.field++ // simply assign the field to trigger effects
 
 dispose() // dispose effect at any point
 ```
@@ -62,10 +62,10 @@ dispose() // dispose effect at any point
 To encapsulate logic you can combine private fields and computed fields
 
 ```ts
-import { Store, field, computed } from "react-bolt"
+import { state, computed } from "react-bolt"
 
-class MyStore extends Store {
-  @field private internal: string
+class MyStore {
+  @state private internal = ""
 
   @computed get public() {
     return this.internal + "heavy computation"
@@ -75,14 +75,14 @@ class MyStore extends Store {
     this.internal = "value"
   }
 
-  // tip: define methods as readonly arrow functions which binds `this`
+  // tip: define methods as read-only arrow functions which binds `this`
   // so it can be passed around e.g in `onClick={store.handler}`
   readonly handler = () => {}
 }
 ```
 
-`computed` will be lazily computed when accessed. The value is invalidated when
-any dependency changes.
+`computed` values will be lazily computed when accessed. The value is
+invalidated when any dependency changes.
 
 ### Nested stores
 
@@ -90,15 +90,15 @@ Stores can be nested.
 
 ```ts
 class Book {
-  @field title: string
+  @state title: string
 
   constructor(title: Pick<Book, "title">) {
     this.title = init.title
   }
 }
 
-class Author extends Store {
-  @field books: Book[] = [
+class Author {
+  @state books: Book[] = [
     new Book({ title: "Hello World" }),
     new Book({ title: "An awesome book" }),
   ]
@@ -114,18 +114,24 @@ changes `titles` field is invalidated and effects are triggered.
 
 ### React hooks
 
-In React use the `useStore` hook to subscribe to value changes.
+In React use the `useStore` hook to subscribe to field value changes.
 
 ```tsx
+import { useStore } from "react-bolt"
 const books = useStore(author, "books")
 const book1title = useStore(books[1], "title")
+
+// specifying multiple fields will return them in an array
+const [books, titles] = useStore(author, "books", "titles")
 ```
 
-You can use the `useBolt` hook which will track reactive values in its scope,
+You can use the `useComputed` hook which will track reactive values in its
+scope,
 
 ```tsx
+import { useComputed } from "react-bolt"
 // deeply tracks dependencies similarly to `computed`
-const titles = useBolt(() => author.books.map((book) => book.title))
+const titles = useComputed(() => author.books.map((book) => book.title))
 ```
 
 Alternatively, use the `createStoreHook` to wrap an instance of a store as a
@@ -140,18 +146,18 @@ const [books, titles] = useAuthor("books", "titles")
 
 ### Primitives
 
-You can also directly use the underlying primitives
+You can also use them as single value primitives
 
 ```ts
-import { atom, computed, effect } from "react-bolt"
+import { state, computed, effect } from "react-bolt"
 
-const a = atom(1)
-const b = atom(2)
+const [a, setA] = state(1)
+const [b, setB] = state(2)
 const c = computed(() => a() + b())
 
 effect(() => {
   console.log(c())
 })
 
-a.set(a() + 1)
+setA(a() + 1)
 ```

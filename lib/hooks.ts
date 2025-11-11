@@ -1,7 +1,7 @@
 import { useCallback, useRef, useSyncExternalStore } from "react"
-import { effect } from "./atom"
+import { effect } from "./state"
 
-export function useBolt<T>(fn: () => T) {
+export function useComputed<T>(fn: () => T): T {
   const value = useRef<T>(fn())
   const get = useCallback(() => value.current, [fn, value])
   return useSyncExternalStore(
@@ -41,7 +41,7 @@ export function useStore<S extends object>(
   arg: ((store: S) => unknown) | keyof S,
   ...args: Array<keyof S>
 ) {
-  return useBolt(
+  return useComputed(
     useCallback(() => {
       if (typeof arg === "function") {
         return arg(store)
