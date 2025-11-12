@@ -163,14 +163,18 @@ export function computed<T>(producer: () => T): Accessor<T> {
   }
 
   function subscribe(callback: CallbackFn): DisposeFn {
-    if (observers.size === 0 && effectScope) {
-      const prevDeps = new Map<Accessor, DisposeFn>()
-      for (const dep of preDeps) {
-        prevDeps.set(dep, dep.subscribe(invalidate))
+    if (observers.size === 0) {
+      if (effectScope) {
+        const prevDeps = new Map<Accessor, DisposeFn>()
+        for (const dep of preDeps) {
+          prevDeps.set(dep, dep.subscribe(invalidate))
+        }
+        value = preValue
+        preDeps.clear()
+        preValue = nil
+      } else {
+        compute()
       }
-      value = preValue
-      preDeps.clear()
-      preValue = nil
     }
 
     observers.add(callback)
