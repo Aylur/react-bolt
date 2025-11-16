@@ -125,8 +125,8 @@ export function effect(fn: CallbackFn): DisposeFn {
  * @returns `Accessor` to the value
  */
 export function computed<T>(producer: () => T): Accessor<T> {
-  let value: T | typeof nil = nil
-  let prevDeps = new Map<Accessor, DisposeFn>()
+  let cachedValue: T | typeof nil = nil
+  let currentDeps = new Map<Accessor, DisposeFn>()
 
   // in an effect scope we want to immediately track dependencies
   // and cache the result to avoid a recomputation after the effect scope
@@ -136,15 +136,15 @@ export function computed<T>(producer: () => T): Accessor<T> {
   const observers = new Set<CallbackFn>()
 
   function invalidate() {
-    value = nil
+    cachedValue = nil
     Array.from(observers).forEach((cb) => cb())
   }
 
-  function compute() {
+  function computeEffect() {
     const [res, deps] = track(producer)
     const newDeps = new Map<Accessor, DisposeFn>()
 
-    for (const [dep, dispose] of prevDeps) {
+    for (const [dep, dispose] of currentDeps) {
       if (!deps.has(dep)) {
         dispose()
       } else {
@@ -158,22 +158,21 @@ export function computed<T>(producer: () => T): Accessor<T> {
       }
     }
 
-    prevDeps = newDeps
-    return (value = res)
+    currentDeps = newDeps
+    return (cachedValue = res)
   }
 
   function subscribe(callback: CallbackFn): DisposeFn {
     if (observers.size === 0) {
       if (effectScope) {
-        const prevDeps = new Map<Accessor, DisposeFn>()
-        for (const dep of preDeps) {
-          prevDeps.set(dep, dep.subscribe(invalidate))
-        }
-        value = preValue
+        cachedValue = preValue
+        currentDeps = new Map(
+          [...preDeps].map((dep) => [dep, dep.subscribe(invalidate)]),
+        )
         preDeps.clear()
         preValue = nil
       } else {
-        compute()
+        computeEffect()
       }
     }
 
@@ -182,15 +181,15 @@ export function computed<T>(producer: () => T): Accessor<T> {
     return () => {
       observers.delete(callback)
       if (observers.size === 0) {
-        prevDeps.forEach((cb) => cb())
-        prevDeps.clear()
-        value = nil
+        currentDeps.forEach((cb) => cb())
+        currentDeps.clear()
+        cachedValue = nil
       }
     }
   }
 
   function get(): T {
-    if (value !== nil) return value
+    if (cachedValue !== nil) return cachedValue
 
     if (observers.size === 0) {
       if (effectScope) {
@@ -203,7 +202,7 @@ export function computed<T>(producer: () => T): Accessor<T> {
       }
     }
 
-    return compute()
+    return computeEffect()
   }
 
   return createAccessor(get, subscribe)
