@@ -1,5 +1,6 @@
 import { useCallback, useRef, useSyncExternalStore } from "react"
 import { effect } from "./state"
+import { shallow } from "./shallow"
 
 export function useComputed<T>(fn: () => T): T {
   const value = useRef<T>(fn())
@@ -9,7 +10,7 @@ export function useComputed<T>(fn: () => T): T {
       (callback) =>
         effect(() => {
           const newValue = fn()
-          if (!Object.is(newValue, value.current)) {
+          if (!shallow(newValue, value.current)) {
             value.current = newValue
             callback()
           }
