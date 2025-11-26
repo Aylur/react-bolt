@@ -35,7 +35,7 @@ function App() {
 ### Stores
 
 ```ts
-import { state, subscribe, effect } from "react-bolt"
+import { state, effect } from "react-bolt"
 
 class MyStore {
   // read-write reactive value

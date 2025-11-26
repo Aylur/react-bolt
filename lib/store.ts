@@ -1,4 +1,4 @@
-import { computed, state } from "./state.js"
+import { type State, computed, state } from "./state.js"
 
 const priv = Symbol("priv")
 
@@ -21,7 +21,25 @@ function defineField(store: Store, key: Key) {
   })
 }
 
-export function stateDecorator<T>(
+export function stateAccessorDecorator<T>(
+  target: ClassAccessorDecoratorTarget<Store, T>,
+  _: ClassAccessorDecoratorContext<Store, T>,
+): ClassAccessorDecoratorResult<Store, T> {
+  const { get } = target as ClassAccessorDecoratorTarget<Store, State<T>>
+  return {
+    get() {
+      return get.call(this)[0]()
+    },
+    set(value) {
+      get.call(this)[1](value)
+    },
+    init(value) {
+      return state(value) as T
+    },
+  }
+}
+
+export function stateFieldDecorator<T>(
   _: undefined,
   ctx: ClassFieldDecoratorContext<Store, T>,
 ): Field<T> {

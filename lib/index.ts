@@ -1,6 +1,7 @@
 import {
   computedDecorator,
-  stateDecorator,
+  stateFieldDecorator,
+  stateAccessorDecorator,
   type Store,
   type Getter,
   type Field,
@@ -30,12 +31,26 @@ export function state<T>(
   _: undefined,
   ctx: ClassFieldDecoratorContext<Store, T>,
 ): Field<T>
+export function state<T>(
+  target: ClassAccessorDecoratorTarget<Store, T>,
+  ctx: ClassAccessorDecoratorContext<Store, T>,
+): ClassAccessorDecoratorResult<Store, T>
 export function state<T>(init: T): State<T>
 export function state<T>(
-  init: T | undefined,
-  ctx?: ClassFieldDecoratorContext<Store, T>,
-): Field<T> | State<T> {
-  if (ctx) return stateDecorator(init as undefined, ctx)
+  init: T | undefined | ClassAccessorDecoratorTarget<Store, T>,
+  ctx?:
+    | ClassFieldDecoratorContext<Store, T>
+    | ClassAccessorDecoratorContext<Store, T>,
+): Field<T> | State<T> | ClassAccessorDecoratorResult<Store, T> {
+  if (ctx && ctx.kind === "field") {
+    return stateFieldDecorator(init as undefined, ctx)
+  }
+  if (ctx && ctx.kind === "accessor") {
+    return stateAccessorDecorator(
+      init as ClassAccessorDecoratorTarget<Store, T>,
+      ctx,
+    )
+  }
   return statePrimitive(init as T)
 }
 
