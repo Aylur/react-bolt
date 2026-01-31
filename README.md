@@ -125,15 +125,6 @@ const book1title = useStore(books[1], "title")
 const [books, titles] = useStore(author, "books", "titles")
 ```
 
-You can use the `useComputed` hook which will track reactive values in its
-scope,
-
-```tsx
-import { useComputed } from "react-bolt"
-// deeply tracks dependencies similarly to `computed`
-const titles = useComputed(() => author.books.map((book) => book.title))
-```
-
 Alternatively, use the `createStoreHook` to wrap an instance of a store as a
 hook.
 
@@ -142,6 +133,22 @@ const useAuthor = createStoreHook(author)
 
 const titles = useAuthor("titles")
 const [books, titles] = useAuthor("books", "titles")
+```
+
+You can use the `useComputed` hook which will track reactive values in its
+scope,
+
+```tsx
+import { useComputed } from "react-bolt"
+
+// deeply tracks dependencies similarly to `computed`
+const titles = useComputed(() => author.books.map((book) => book.title))
+
+// You might want to specify an `equals` function to avoid React infinite loops
+const titles = useComputed({
+  fn: () => author.books.map((book) => book.title),
+  equals: (prev, next) => prev.every((v, i) => Object.is(v, next[i])),
+})
 ```
 
 ### Primitives
@@ -160,4 +167,11 @@ effect(() => {
 })
 
 setA(a() + 1)
+```
+
+```tsx
+import { useAccessor } from "react-bolt"
+
+const aValue = useAccessor(a)
+const cValue = useAccessor(c)
 ```

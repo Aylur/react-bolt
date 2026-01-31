@@ -1,16 +1,31 @@
-import { useCallback, useRef, useSyncExternalStore } from "react"
-import { effect } from "./state"
-import { shallow } from "./shallow"
+import { useCallback, useRef, useState, useSyncExternalStore } from "react"
+import { Accessor, effect } from "./state"
 
-export function useComputed<T>(fn: () => T): T {
-  const value = useRef<T>(fn())
-  const get = useCallback(() => value.current, [fn, value])
+export function useAccessor<T>(accessor: Accessor<T>): T {
+  return useSyncExternalStore(accessor.subscribe, accessor.peek, accessor.peek)
+}
+
+type UseComputedArgs<T> =
+  | (() => T)
+  | {
+      fn(): T
+      equals(prev: T, next: T): boolean
+    }
+
+export function useComputed<T>(args: UseComputedArgs<T>): T {
+  const fn = typeof args === "function" ? args : args.fn
+  const equals = typeof args === "object" ? args.equals : Object.is
+
+  const [init] = useState(fn)
+  const value = useRef<T>(init)
+  const get = useCallback(() => value.current, [value])
+
   return useSyncExternalStore(
     useCallback(
       (callback) =>
         effect(() => {
           const newValue = fn()
-          if (!shallow(newValue, value.current)) {
+          if (!equals(newValue, value.current)) {
             value.current = newValue
             callback()
           }
@@ -32,22 +47,13 @@ export function useStore<S extends object, Keys extends Array<keyof S>>(
   ...keys: Keys
 ): { [K in keyof Keys]: S[Keys[K]] }
 
-export function useStore<S extends object, Result>(
-  store: S,
-  selector: (store: S) => Result,
-): Result
-
 export function useStore<S extends object>(
   store: S,
-  arg: ((store: S) => unknown) | keyof S,
+  arg: keyof S,
   ...args: Array<keyof S>
 ) {
   return useComputed(
     useCallback(() => {
-      if (typeof arg === "function") {
-        return arg(store)
-      }
-
       if (args.length === 0) {
         return store[arg]
       }
@@ -63,8 +69,6 @@ type StoreHook<S extends object> = {
   <Keys extends Array<keyof S>>(
     ...keys: Keys
   ): { [K in keyof Keys]: S[Keys[K]] }
-
-  <Result>(selector: (store: S) => Result): Result
 }
 
 export function createStoreHook<S extends object>(store: S): StoreHook<S> {

@@ -2,7 +2,8 @@ type DisposeFn = () => void
 type CallbackFn = () => void
 type SubscribeFn = (callback: CallbackFn) => DisposeFn
 
-let effectScope = false
+let effectScope = 0
+
 const nil = Symbol("nil")
 const accessStack = new Array<Set<Accessor>>()
 
@@ -36,19 +37,23 @@ function createAccessor<T>(get: () => T, subscribe: SubscribeFn): Accessor<T> {
 }
 
 export type Accessed<T> = T extends Accessor<infer V> ? V : never
-
-export type Setter<T> = (value: T) => void // TODO: support updater fn
-
+export type Setter<T> = (value: T) => void
 export type State<T> = [Accessor<T>, Setter<T>]
+
+type StateOptions<T> = {
+  equals?(prev: T, next: T): boolean
+}
 
 /**
  * Create a writable signal.
  * @param init The intial value of the signal
  * @returns An `Accessor` and a setter function
  */
-export function state<T>(init: T): State<T> {
+export function state<T>(init: T, options?: StateOptions<T>): State<T> {
   let currentValue = init
+
   const observers = new Set<CallbackFn>()
+  const equals = options?.equals ?? Object.is
 
   const subscribe: SubscribeFn = (callback) => {
     observers.add(callback)
@@ -56,7 +61,7 @@ export function state<T>(init: T): State<T> {
   }
 
   const set: Setter<T> = (value) => {
-    if (!Object.is(currentValue, value)) {
+    if (!equals(currentValue, value)) {
       currentValue = value
       Array.from(observers).forEach((cb) => cb())
     }
@@ -69,7 +74,7 @@ export function state<T>(init: T): State<T> {
   return [createAccessor(get, subscribe), set]
 }
 
-function track<T>(fn: () => T) {
+export function run<T>(fn: () => T) {
   const deps = new Set<Accessor>()
   accessStack.push(deps)
   const res = fn()
@@ -77,17 +82,25 @@ function track<T>(fn: () => T) {
   return [res, deps] as const
 }
 
+type EffectOptions<T> = {
+  init: T
+}
+
 /**
  * Runs a function tracking the dependencies and reruns whenever they change.
  * @param fn The effect logic
  * @returns Dispose function to stop the effect
  */
-export function effect(fn: CallbackFn): DisposeFn {
+export function effect<T = never>(
+  fn: (prev: T) => T,
+  options?: EffectOptions<T>,
+): DisposeFn {
+  let value = options?.init as T
   let prevDeps = new Map<Accessor, DisposeFn>()
 
   function _effect() {
-    effectScope = true
-    const [, deps] = track(fn)
+    effectScope++
+    const [res, deps] = run(() => fn(value))
     const newDeps = new Map<Accessor, DisposeFn>()
 
     for (const [dep, dispose] of prevDeps) {
@@ -105,7 +118,8 @@ export function effect(fn: CallbackFn): DisposeFn {
     }
 
     prevDeps = newDeps
-    effectScope = false
+    value = res
+    effectScope--
   }
 
   _effect()
@@ -141,7 +155,7 @@ export function computed<T>(producer: () => T): Accessor<T> {
   }
 
   function computeEffect() {
-    const [res, deps] = track(producer)
+    const [res, deps] = run(producer)
     const newDeps = new Map<Accessor, DisposeFn>()
 
     for (const [dep, dispose] of currentDeps) {
@@ -193,7 +207,7 @@ export function computed<T>(producer: () => T): Accessor<T> {
 
     if (observers.size === 0) {
       if (effectScope) {
-        const [res, deps] = track(producer)
+        const [res, deps] = run(producer)
         preDeps = deps
         preValue = res
         return res
