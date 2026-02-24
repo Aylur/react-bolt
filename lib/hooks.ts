@@ -9,7 +9,7 @@ type UseComputedArgs<T> =
   | (() => T)
   | {
       fn(): T
-      equals(prev: T, next: T): boolean
+      equals(prev: NoInfer<T>, next: NoInfer<T>): boolean
     }
 
 export function useComputed<T>(args: UseComputedArgs<T>): T {
