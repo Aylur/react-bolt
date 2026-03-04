@@ -1,12 +1,12 @@
 # React Bolt
 
-Yet another client side state management library
+Yet another client side state management library.
 
 ```tsx
 import { state, computed, useStore } from "react-bolt"
 
 class MyStore {
-  @state count = 1
+  @state accessor count = 1
 
   @computed get double() {
     return this.count * 2
@@ -39,7 +39,7 @@ import { state, effect } from "react-bolt"
 
 class MyStore {
   // read-write reactive value
-  @state field: number
+  @state accessor field: number
 
   constructor(init: number) {
     this.field = init
@@ -65,7 +65,7 @@ To encapsulate logic you can combine private fields and computed fields
 import { state, computed } from "react-bolt"
 
 class MyStore {
-  @state private internal = ""
+  @state private accessor internal = ""
 
   @computed get public() {
     return this.internal + "heavy computation"
@@ -120,9 +120,6 @@ In React use the `useStore` hook to subscribe to field value changes.
 import { useStore } from "react-bolt"
 const books = useStore(author, "books")
 const book1title = useStore(books[1], "title")
-
-// specifying multiple fields will return them in an array
-const [books, titles] = useStore(author, "books", "titles")
 ```
 
 Alternatively, use the `createStoreHook` to wrap an instance of a store as a
@@ -151,18 +148,25 @@ const titles = useComputed({
 })
 ```
 
+> [!TIP]
+>
+> React invokes subscriptions before getters which means the body of useComputed
+> will be invoked twice on mount so you might not want to do haavy computations
+> there.
+
 ### Primitives
 
-You can also use them as single value primitives
+You can also use the underlying primitives
 
 ```ts
-import { state, computed, effect } from "react-bolt"
+import { createState, createComputed, effect } from "react-bolt"
 
-const [a, setA] = state(1)
-const [b, setB] = state(2)
-const c = computed(() => a() + b())
+const [a, setA] = createState(1)
+const [b, setB] = createState(2)
+const c = createComputed(() => a() + b())
 
 effect(() => {
+  console.log(c.peek()) // .peek() will not track it as a dependency
   console.log(c())
 })
 
