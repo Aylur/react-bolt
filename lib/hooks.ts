@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useSyncExternalStore } from "react"
-import { Accessor, effect } from "./state"
+import { Accessor, effect } from "./state.js"
 
 export function useAccessor<T>(accessor: Accessor<T>): T {
   return useSyncExternalStore(accessor.subscribe, accessor.peek, accessor.peek)
